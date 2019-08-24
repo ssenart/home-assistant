@@ -20,11 +20,10 @@ CONF_WEBDRIVER = "webdriver"
 CONF_TMPDIR = "tmpdir"
 DEFAULT_SCAN_INTERVAL = timedelta(hours=4)
 ICON_WATER = "mdi:water"
-CONSUMPTION = "daily_liter"
+DAILY_LITER_CONSUMPTION = "daily_liter"
+TOTAL_LITER_CONSUMPTION = "total_liter"
 TIME = "time"
 TYPE = "type"
-INDEX_CURRENT = -1
-INDEX_LAST = -2
 ATTRIBUTION = "Data provided by VeoliaIDF"
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
@@ -49,7 +48,6 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     account = VeoliaIDFAccount(hass, username, password, webdriver, tmpdir, scan_interval)
     add_entities(account.sensors, True)
 
-
 class VeoliaIDFAccount:
     """Representation of a VeoliaIDF account."""
 
@@ -66,7 +64,9 @@ class VeoliaIDFAccount:
         call_later(hass, 5, self.update_veolia_data)
 
         self.sensors.append(
-            VeoliaIDFSensor("Veolia yesterday", self))
+            VeoliaIDFSensor("Veolia yesterday liter", DAILY_LITER_CONSUMPTION, VOLUME_LITERS, self))
+        self.sensors.append(
+            VeoliaIDFSensor("Veolia total liter", TOTAL_LITER_CONSUMPTION, VOLUME_LITERS, self))
 
         track_time_interval(hass, self.update_veolia_data, self._scan_interval)
 
@@ -107,13 +107,15 @@ class VeoliaIDFAccount:
 class VeoliaIDFSensor(Entity):
     """Representation of a sensor entity for Linky."""
 
-    def __init__(self, name, account: VeoliaIDFAccount):
+    def __init__(self, name, identifier, unit, account: VeoliaIDFAccount):
         """Initialize the sensor."""
         self._name = name
+        self._identifier = identifier
+        self._unit = unit
         self.__account = account
         self._username = account.username
         self.__time = None
-        self.__consumption = None
+        self.__measure = None
         self.__type = None
 
     @property
@@ -124,12 +126,12 @@ class VeoliaIDFSensor(Entity):
     @property
     def state(self):
         """Return the state of the sensor."""
-        return self.__consumption
+        return self.__measure
 
     @property
     def unit_of_measurement(self):
         """Return the unit of measurement."""
-        return VOLUME_LITERS
+        return self._unit
 
     @property
     def icon(self):
@@ -151,7 +153,7 @@ class VeoliaIDFSensor(Entity):
         _LOGGER.debug("Sensor update() invoked")
         if self.__account.data is not None:
             data = self.__account.data[-1]
-            self.__consumption = data[CONSUMPTION]
+            self.__measure = data[self._identifier]
             self.__time = data[TIME]
             self.__type = data[TYPE]
 
