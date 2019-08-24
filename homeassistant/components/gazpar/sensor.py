@@ -20,7 +20,11 @@ CONF_WEBDRIVER = "webdriver"
 CONF_TMPDIR = "tmpdir"
 DEFAULT_SCAN_INTERVAL = timedelta(hours=4)
 ICON_GAS = "mdi:fire"
-CONSUMPTION = "daily_kWh"
+TOTAL_KWH_CONSUMPTION = "total_kWh"
+TOTAL_M3_CONSUMPTION = "total_m3"
+DAILY_KWH_CONSUMPTION = "daily_kWh"
+DAILY_M3_CONSUMPTION = "daily_m3"
+VOLUME_M3="m³"
 TIME = "time"
 INDEX_CURRENT = -1
 INDEX_LAST = -2
@@ -65,7 +69,13 @@ class GazparAccount:
         call_later(hass, 5, self.update_gazpar_data)
 
         self.sensors.append(
-            GazparSensor("Gazpar yesterday", self))
+            GazparSensor("Gazpar yesterday kWh", DAILY_KWH_CONSUMPTION, ENERGY_KILO_WATT_HOUR, self))
+        self.sensors.append(
+            GazparSensor("Gazpar yesterday m3", DAILY_M3_CONSUMPTION, VOLUME_M3, self))
+        self.sensors.append(
+            GazparSensor("Gazpar total kWh", TOTAL_KWH_CONSUMPTION, ENERGY_KILO_WATT_HOUR, self))
+        self.sensors.append(
+            GazparSensor("Gazpar total m3", TOTAL_M3_CONSUMPTION, VOLUME_M3, self))
 
         track_time_interval(hass, self.update_gazpar_data, self._scan_interval)
 
@@ -102,17 +112,18 @@ class GazparAccount:
         """Return the data."""
         return self._data
 
-
 class GazparSensor(Entity):
     """Representation of a sensor entity for Linky."""
 
-    def __init__(self, name, account: GazparAccount):
+    def __init__(self, name, identifier, unit, account: GazparAccount):
         """Initialize the sensor."""
         self._name = name
+        self._identifier = identifier
+        self._unit = unit
         self.__account = account
         self._username = account.username
         self.__time = None
-        self.__consumption = None
+        self.__measure = None
         self.__type = None
 
     @property
@@ -123,12 +134,12 @@ class GazparSensor(Entity):
     @property
     def state(self):
         """Return the state of the sensor."""
-        return self.__consumption
+        return self.__measure
 
     @property
     def unit_of_measurement(self):
         """Return the unit of measurement."""
-        return ENERGY_KILO_WATT_HOUR
+        return self._unit
 
     @property
     def icon(self):
@@ -149,7 +160,7 @@ class GazparSensor(Entity):
         _LOGGER.debug("Sensor update() invoked")
         if self.__account.data is not None:
             data = self.__account.data[-1]
-            self.__consumption = data[CONSUMPTION]
+            self.__measure = data[self._identifier]
             self.__time = data[TIME]
 
 
