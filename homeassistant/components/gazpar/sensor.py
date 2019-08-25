@@ -2,6 +2,7 @@
 from datetime import timedelta
 import json
 import logging
+import traceback
 
 from pygazpar.client import Client
 import voluptuous as vol
@@ -26,8 +27,6 @@ DAILY_KWH_CONSUMPTION = "daily_kWh"
 DAILY_M3_CONSUMPTION = "daily_m3"
 VOLUME_M3="m³"
 TIME = "time"
-INDEX_CURRENT = -1
-INDEX_LAST = -2
 ATTRIBUTION = "Data provided by GrDF"
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
@@ -43,15 +42,21 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
     """Configure the platform and add the Gazpar sensor."""
-    username = config[CONF_USERNAME]
-    password = config[CONF_PASSWORD]
-    webdriver = config[CONF_WEBDRIVER]
-    tmpdir = config[CONF_TMPDIR]
-    scan_interval = config[CONF_SCAN_INTERVAL]
 
-    account = GazparAccount(hass, username, password, webdriver, tmpdir, scan_interval)
-    add_entities(account.sensors, True)
+    _LOGGER.debug("Initializing Gazpar platform...")
 
+    try:
+        username = config[CONF_USERNAME]
+        password = config[CONF_PASSWORD]
+        webdriver = config[CONF_WEBDRIVER]
+        tmpdir = config[CONF_TMPDIR]
+        scan_interval = config[CONF_SCAN_INTERVAL]
+
+        account = GazparAccount(hass, username, password, webdriver, tmpdir, scan_interval)
+        add_entities(account.sensors, True)
+        _LOGGER.debug("Gazpar platform initialization has completed successfully")
+    except BaseException:
+        _LOGGER.error("Gazpar platform initialization has failed with exception : %s", traceback.format_exc())
 
 class GazparAccount:
     """Representation of a Gazpar account."""
@@ -81,16 +86,20 @@ class GazparAccount:
 
     def update_gazpar_data(self, event_time):
         """Fetch new state data for the sensor."""
-        client = Client(self._username, self.__password, self._webdriver, self._tmpdir)
+
+        _LOGGER.debug("Querying PyGazpar library for new data...")
+
         try:
+            client = Client(self._username, self.__password, self._webdriver, self._tmpdir)
             client.update()
             self._data = client.data
             _LOGGER.debug(json.dumps(self._data, indent=2))
             for sensor in self.sensors:
                 sensor.async_schedule_update_ha_state(True)
-                _LOGGER.debug("update event sent")
-        except BaseException as exp:
-            _LOGGER.error(exp)
+                _LOGGER.debug("Sensor notified that new data is available")
+            _LOGGER.debug("New data have been retrieved successfully from PyGazpar library")
+        except BaseException:
+            _LOGGER.error("Failed to query PyGazpar library with exception : %s", traceback.format_exc())
 
     @property
     def username(self):
@@ -157,10 +166,15 @@ class GazparSensor(Entity):
 
     def update(self):
         """Retrieve the new data for the sensor."""
-        _LOGGER.debug("Sensor update() invoked")
-        if self.__account.data is not None:
-            data = self.__account.data[-1]
-            self.__measure = data[self._identifier]
-            self.__time = data[TIME]
 
-
+        _LOGGER.debug("HA requests its data to be updated...")
+        try:
+            if self.__account.data is not None:
+                data = self.__account.data[-1]
+                self.__measure = data[self._identifier]
+                self.__time = data[TIME]
+                _LOGGER.debug("HA data have been updated successfully")
+            else:
+                _LOGGER.debug("No data available yet for update")
+        except BaseException:
+            _LOGGER.error("Failed to update HA data with exception : %s", traceback.format_exc())
