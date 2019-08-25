@@ -3,7 +3,7 @@
   "name": "VeoliaIDF",
   "documentation": "https://www.home-assistant.io/components/veoliaidf",
   "requirements": [
-    "pyveoliaidf==0.1.3"
+    "pyveoliaidf==0.1.4"
   ],
   "dependencies": [],
   "codeowners": [
