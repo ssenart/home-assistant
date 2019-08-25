@@ -96,7 +96,7 @@ class GazparAccount:
             _LOGGER.debug(json.dumps(self._data, indent=2))
             for sensor in self.sensors:
                 sensor.async_schedule_update_ha_state(True)
-                _LOGGER.debug("Sensor notified that new data is available")
+                _LOGGER.debug("HA notified that new data is available")
             _LOGGER.debug("New data have been retrieved successfully from PyGazpar library")
         except BaseException:
             _LOGGER.error("Failed to query PyGazpar library with exception : %s", traceback.format_exc())
