@@ -208,7 +208,7 @@ class GazparSensor(Entity):
                 else:
                     # data is a date with GAZPAR_DATE_FORMAT
                     self.__measure = datetime.strptime(data[self._identifier], GAZPAR_DATE_FORMAT)
-                    self.__measure.replace(hour=23, minute=59, second=59)
+                    self.__measure = self.__measure.replace(hour=23, minute=59, second=59)
                 self.__timestamp = data["timestamp"]
                 self.__type = data["type"]
                 _LOGGER.debug("HA data have been updated successfully")
