@@ -10,7 +10,7 @@ import voluptuous as vol
 from homeassistant.components.sensor import PLATFORM_SCHEMA
 from homeassistant.const import (
     ATTR_ATTRIBUTION, CONF_PASSWORD, CONF_USERNAME, CONF_SCAN_INTERVAL,
-    ENERGY_KILO_WATT_HOUR)
+    ENERGY_KILO_WATT_HOUR, TEMP_CELSIUS)
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import track_time_interval, call_later
@@ -21,13 +21,27 @@ CONF_WEBDRIVER = "webdriver"
 CONF_TMPDIR = "tmpdir"
 DEFAULT_SCAN_INTERVAL = timedelta(hours=4)
 ICON_GAS = "mdi:fire"
-TOTAL_KWH_CONSUMPTION = "total_kWh"
-TOTAL_M3_CONSUMPTION = "total_m3"
-DAILY_KWH_CONSUMPTION = "daily_kWh"
-DAILY_M3_CONSUMPTION = "daily_m3"
-VOLUME_M3="m³"
-TIME = "time"
-ATTRIBUTION = "Data provided by GrDF"
+
+HA_VOLUME_M3 = "m³"
+HA_CONVERTOR_FACTOR_KWH_M3="kWh/m³"
+HA_ATTRIBUTION = "Data provided by GrDF"
+HA_TIME = "time"
+HA_TIMESTAMP = "timestamp"
+HA_TYPE = "type"
+
+GAZPAR_LAST_START_INDEX = "start_index_m3"
+GAZPAR_LAST_END_INDEX = "end_index_m3"
+GAZPAR_LAST_VOLUME_M3 = "volume_m3"
+GAZPAR_LAST_ENERGY_KWH = "energy_kwh"
+GAZPAR_LAST_CONVERTER_FACTOR = "converter_factor"
+GAZPAR_LAST_TEMPERATURE = "local_temperature"
+
+HA_LAST_START_INDEX = "Gazpar last start index"
+HA_LAST_END_INDEX = "Gazpar last end index"
+HA_LAST_VOLUME_M3 = "Gazpar last volume"
+HA_LAST_ENERGY_KWH = "Gazpar last energy"
+HA_LAST_CONVERTER_FACTOR = "Gazpar last converter factor"
+HA_LAST_TEMPERATURE = "Gazpar last temperature"
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(CONF_USERNAME): cv.string,
@@ -74,13 +88,17 @@ class GazparAccount:
         call_later(hass, 5, self.update_gazpar_data)
 
         self.sensors.append(
-            GazparSensor("Gazpar yesterday kWh", DAILY_KWH_CONSUMPTION, ENERGY_KILO_WATT_HOUR, self))
+            GazparSensor(HA_LAST_START_INDEX, GAZPAR_LAST_START_INDEX, HA_VOLUME_M3, self))
         self.sensors.append(
-            GazparSensor("Gazpar yesterday m3", DAILY_M3_CONSUMPTION, VOLUME_M3, self))
+            GazparSensor(HA_LAST_END_INDEX, GAZPAR_LAST_END_INDEX, HA_VOLUME_M3, self))
         self.sensors.append(
-            GazparSensor("Gazpar total kWh", TOTAL_KWH_CONSUMPTION, ENERGY_KILO_WATT_HOUR, self))
+            GazparSensor(HA_LAST_VOLUME_M3, GAZPAR_LAST_VOLUME_M3, HA_VOLUME_M3, self))
         self.sensors.append(
-            GazparSensor("Gazpar total m3", TOTAL_M3_CONSUMPTION, VOLUME_M3, self))
+            GazparSensor(HA_LAST_ENERGY_KWH, GAZPAR_LAST_ENERGY_KWH, ENERGY_KILO_WATT_HOUR, self))
+        self.sensors.append(
+            GazparSensor(HA_LAST_CONVERTER_FACTOR, GAZPAR_LAST_CONVERTER_FACTOR, HA_CONVERTOR_FACTOR_KWH_M3, self))
+        self.sensors.append(
+            GazparSensor(HA_LAST_TEMPERATURE, GAZPAR_LAST_TEMPERATURE, TEMP_CELSIUS, self))
 
         track_time_interval(hass, self.update_gazpar_data, self._scan_interval)
 
@@ -90,9 +108,9 @@ class GazparAccount:
         _LOGGER.debug("Querying PyGazpar library for new data...")
 
         try:
-            client = Client(self._username, self.__password, self._webdriver, self._tmpdir)
+            client = Client(self._username, self.__password, self._webdriver, 30, self._tmpdir)
             client.update()
-            self._data = client.data
+            self._data = client.data()
             _LOGGER.debug(json.dumps(self._data, indent=2))
             for sensor in self.sensors:
                 sensor.async_schedule_update_ha_state(True)
@@ -132,6 +150,7 @@ class GazparSensor(Entity):
         self.__account = account
         self._username = account.username
         self.__time = None
+        self.__timestamp = None
         self.__measure = None
         self.__type = None
 
@@ -159,8 +178,10 @@ class GazparSensor(Entity):
     def device_state_attributes(self):
         """Return the state attributes of the sensor."""
         return {
-            ATTR_ATTRIBUTION: ATTRIBUTION,
-            TIME: self.__time,
+            ATTR_ATTRIBUTION: HA_ATTRIBUTION,
+            HA_TIME: self.__time,
+            HA_TIMESTAMP: self.__timestamp,
+            HA_TYPE: self.__type,
             CONF_USERNAME: self._username
         }
 
@@ -172,7 +193,9 @@ class GazparSensor(Entity):
             if self.__account.data is not None:
                 data = self.__account.data[-1]
                 self.__measure = data[self._identifier]
-                self.__time = data[TIME]
+                self.__time = data["date"]
+                self.__timestamp = data["timestamp"]
+                self.__type = data["type"]
                 _LOGGER.debug("HA data have been updated successfully")
             else:
                 _LOGGER.debug("No data available yet for update")
