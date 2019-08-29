@@ -1,5 +1,5 @@
 """Support for Gazpar."""
-from datetime import timedelta
+from datetime import timedelta, datetime
 import json
 import logging
 import traceback
@@ -29,19 +29,26 @@ HA_TIME = "time"
 HA_TIMESTAMP = "timestamp"
 HA_TYPE = "type"
 
+GAZPAR_LAST_DATE = "date"
 GAZPAR_LAST_START_INDEX = "start_index_m3"
 GAZPAR_LAST_END_INDEX = "end_index_m3"
 GAZPAR_LAST_VOLUME_M3 = "volume_m3"
 GAZPAR_LAST_ENERGY_KWH = "energy_kwh"
 GAZPAR_LAST_CONVERTER_FACTOR = "converter_factor"
 GAZPAR_LAST_TEMPERATURE = "local_temperature"
+GAZPAR_DATE_FORMAT = "%d/%m/%Y"
 
+HA_LAST_PERIOD_START_TIME = "Gazpar last period start time"
+HA_LAST_PERIOD_END_TIME = "Gazpar last period end time"
 HA_LAST_START_INDEX = "Gazpar last start index"
 HA_LAST_END_INDEX = "Gazpar last end index"
 HA_LAST_VOLUME_M3 = "Gazpar last volume"
 HA_LAST_ENERGY_KWH = "Gazpar last energy"
 HA_LAST_CONVERTER_FACTOR = "Gazpar last converter factor"
 HA_LAST_TEMPERATURE = "Gazpar last temperature"
+
+LAST_INDEX = -1
+BEFORE_LAST_INDEX = -2
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(CONF_USERNAME): cv.string,
@@ -88,17 +95,21 @@ class GazparAccount:
         call_later(hass, 5, self.update_gazpar_data)
 
         self.sensors.append(
-            GazparSensor(HA_LAST_START_INDEX, GAZPAR_LAST_START_INDEX, HA_VOLUME_M3, self))
+            GazparSensor(HA_LAST_PERIOD_START_TIME, GAZPAR_LAST_DATE, None, BEFORE_LAST_INDEX, self))
         self.sensors.append(
-            GazparSensor(HA_LAST_END_INDEX, GAZPAR_LAST_END_INDEX, HA_VOLUME_M3, self))
+            GazparSensor(HA_LAST_PERIOD_END_TIME, GAZPAR_LAST_DATE, None, LAST_INDEX, self))
         self.sensors.append(
-            GazparSensor(HA_LAST_VOLUME_M3, GAZPAR_LAST_VOLUME_M3, HA_VOLUME_M3, self))
+            GazparSensor(HA_LAST_START_INDEX, GAZPAR_LAST_START_INDEX, HA_VOLUME_M3, LAST_INDEX, self))
         self.sensors.append(
-            GazparSensor(HA_LAST_ENERGY_KWH, GAZPAR_LAST_ENERGY_KWH, ENERGY_KILO_WATT_HOUR, self))
+            GazparSensor(HA_LAST_END_INDEX, GAZPAR_LAST_END_INDEX, HA_VOLUME_M3, LAST_INDEX, self))
         self.sensors.append(
-            GazparSensor(HA_LAST_CONVERTER_FACTOR, GAZPAR_LAST_CONVERTER_FACTOR, HA_CONVERTOR_FACTOR_KWH_M3, self))
+            GazparSensor(HA_LAST_VOLUME_M3, GAZPAR_LAST_VOLUME_M3, HA_VOLUME_M3, LAST_INDEX, self))
         self.sensors.append(
-            GazparSensor(HA_LAST_TEMPERATURE, GAZPAR_LAST_TEMPERATURE, TEMP_CELSIUS, self))
+            GazparSensor(HA_LAST_ENERGY_KWH, GAZPAR_LAST_ENERGY_KWH, ENERGY_KILO_WATT_HOUR, LAST_INDEX, self))
+        self.sensors.append(
+            GazparSensor(HA_LAST_CONVERTER_FACTOR, GAZPAR_LAST_CONVERTER_FACTOR, HA_CONVERTOR_FACTOR_KWH_M3, LAST_INDEX, self))
+        self.sensors.append(
+            GazparSensor(HA_LAST_TEMPERATURE, GAZPAR_LAST_TEMPERATURE, TEMP_CELSIUS, LAST_INDEX, self))
 
         track_time_interval(hass, self.update_gazpar_data, self._scan_interval)
 
@@ -142,14 +153,14 @@ class GazparAccount:
 class GazparSensor(Entity):
     """Representation of a sensor entity for Linky."""
 
-    def __init__(self, name, identifier, unit, account: GazparAccount):
+    def __init__(self, name, identifier, unit, index, account: GazparAccount):
         """Initialize the sensor."""
         self._name = name
         self._identifier = identifier
         self._unit = unit
+        self._index = index
         self.__account = account
         self._username = account.username
-        self.__time = None
         self.__timestamp = None
         self.__measure = None
         self.__type = None
@@ -179,7 +190,6 @@ class GazparSensor(Entity):
         """Return the state attributes of the sensor."""
         return {
             ATTR_ATTRIBUTION: HA_ATTRIBUTION,
-            HA_TIME: self.__time,
             HA_TIMESTAMP: self.__timestamp,
             HA_TYPE: self.__type,
             CONF_USERNAME: self._username
@@ -191,9 +201,14 @@ class GazparSensor(Entity):
         _LOGGER.debug("HA requests its data to be updated...")
         try:
             if self.__account.data is not None:
-                data = self.__account.data[-1]
-                self.__measure = data[self._identifier]
-                self.__time = data["date"]
+                data = self.__account.data[self._index]
+                if self._unit is not None:
+                    # data is a measure in a given unit
+                    self.__measure = data[self._identifier]
+                else:
+                    # data is a date with GAZPAR_DATE_FORMAT
+                    self.__measure = datetime.strptime(data[self._identifier], GAZPAR_DATE_FORMAT)
+                    self.__measure.replace(hour=23, minute=59, second=59)
                 self.__timestamp = data["timestamp"]
                 self.__type = data["type"]
                 _LOGGER.debug("HA data have been updated successfully")
