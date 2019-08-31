@@ -5,6 +5,7 @@ import logging
 import traceback
 
 from pygazpar.client import Client
+from pygazpar.enum import PropertyNameEnum
 import voluptuous as vol
 
 from homeassistant.components.sensor import PLATFORM_SCHEMA
@@ -95,21 +96,21 @@ class GazparAccount:
         call_later(hass, 5, self.update_gazpar_data)
 
         self.sensors.append(
-            GazparSensor(HA_LAST_PERIOD_START_TIME, GAZPAR_LAST_DATE, None, BEFORE_LAST_INDEX, self))
+            GazparSensor(HA_LAST_PERIOD_START_TIME, PropertyNameEnum.DATE.value, None, BEFORE_LAST_INDEX, self))
         self.sensors.append(
-            GazparSensor(HA_LAST_PERIOD_END_TIME, GAZPAR_LAST_DATE, None, LAST_INDEX, self))
+            GazparSensor(HA_LAST_PERIOD_END_TIME, PropertyNameEnum.DATE.value, None, LAST_INDEX, self))
         self.sensors.append(
-            GazparSensor(HA_LAST_START_INDEX, GAZPAR_LAST_START_INDEX, HA_VOLUME_M3, LAST_INDEX, self))
+            GazparSensor(HA_LAST_START_INDEX, PropertyNameEnum.START_INDEX_M3.value, HA_VOLUME_M3, LAST_INDEX, self))
         self.sensors.append(
-            GazparSensor(HA_LAST_END_INDEX, GAZPAR_LAST_END_INDEX, HA_VOLUME_M3, LAST_INDEX, self))
+            GazparSensor(HA_LAST_END_INDEX, PropertyNameEnum.END_INDEX_M3.value, HA_VOLUME_M3, LAST_INDEX, self))
         self.sensors.append(
-            GazparSensor(HA_LAST_VOLUME_M3, GAZPAR_LAST_VOLUME_M3, HA_VOLUME_M3, LAST_INDEX, self))
+            GazparSensor(HA_LAST_VOLUME_M3, PropertyNameEnum.VOLUME_M3.value, HA_VOLUME_M3, LAST_INDEX, self))
         self.sensors.append(
-            GazparSensor(HA_LAST_ENERGY_KWH, GAZPAR_LAST_ENERGY_KWH, ENERGY_KILO_WATT_HOUR, LAST_INDEX, self))
+            GazparSensor(HA_LAST_ENERGY_KWH, PropertyNameEnum.ENERGY_KWH.value, ENERGY_KILO_WATT_HOUR, LAST_INDEX, self))
         self.sensors.append(
-            GazparSensor(HA_LAST_CONVERTER_FACTOR, GAZPAR_LAST_CONVERTER_FACTOR, HA_CONVERTOR_FACTOR_KWH_M3, LAST_INDEX, self))
+            GazparSensor(HA_LAST_CONVERTER_FACTOR, PropertyNameEnum.CONVERTER_FACTOR.value, HA_CONVERTOR_FACTOR_KWH_M3, LAST_INDEX, self))
         self.sensors.append(
-            GazparSensor(HA_LAST_TEMPERATURE, GAZPAR_LAST_TEMPERATURE, TEMP_CELSIUS, LAST_INDEX, self))
+            GazparSensor(HA_LAST_TEMPERATURE, PropertyNameEnum.LOCAL_TEMPERATURE.value, TEMP_CELSIUS, LAST_INDEX, self))
 
         track_time_interval(hass, self.update_gazpar_data, self._scan_interval)
 
