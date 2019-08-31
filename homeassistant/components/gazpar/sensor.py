@@ -30,13 +30,6 @@ HA_TIME = "time"
 HA_TIMESTAMP = "timestamp"
 HA_TYPE = "type"
 
-GAZPAR_LAST_DATE = "date"
-GAZPAR_LAST_START_INDEX = "start_index_m3"
-GAZPAR_LAST_END_INDEX = "end_index_m3"
-GAZPAR_LAST_VOLUME_M3 = "volume_m3"
-GAZPAR_LAST_ENERGY_KWH = "energy_kwh"
-GAZPAR_LAST_CONVERTER_FACTOR = "converter_factor"
-GAZPAR_LAST_TEMPERATURE = "local_temperature"
 GAZPAR_DATE_FORMAT = "%d/%m/%Y"
 
 HA_LAST_PERIOD_START_TIME = "Gazpar last period start time"
