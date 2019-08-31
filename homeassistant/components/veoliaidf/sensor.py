@@ -5,7 +5,7 @@ import logging
 import traceback
 
 from pyveoliaidf.client import Client
-from pygazpar.enum import PropertyNameEnum
+from pyveoliaidf.enum import PropertyNameEnum
 import voluptuous as vol
 
 from homeassistant.components.sensor import PLATFORM_SCHEMA
@@ -19,8 +19,10 @@ from homeassistant.helpers.event import track_time_interval, call_later
 _LOGGER = logging.getLogger(__name__)
 
 CONF_WEBDRIVER = "webdriver"
+CONF_WAITTIME = "wait_time"
 CONF_TMPDIR = "tmpdir"
 DEFAULT_SCAN_INTERVAL = timedelta(hours=4)
+DEFAULT_WAITTIME = 30
 ICON_WATER = "mdi:water"
 
 HA_TIME = "time"
@@ -28,7 +30,7 @@ HA_TIMESTAMP = "timestamp"
 HA_TYPE = "type"
 HA_ATTRIBUTION = "Data provided by VeoliaIDF"
 
-VEOLIA_DATETIME_FORMAT = "%d/%m/%Y %H:%M:%S"
+VEOLIA_DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 HA_PERIOD_START_TIME = "Veolia period start time"
 HA_PERIOD_END_TIME = "Veolia period end time"
@@ -42,12 +44,14 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(CONF_USERNAME): cv.string,
     vol.Required(CONF_PASSWORD): cv.string,
     vol.Required(CONF_WEBDRIVER): cv.string,
+    vol.Optional(
+                    CONF_WAITTIME, default=DEFAULT_WAITTIME
+                ): int,
     vol.Required(CONF_TMPDIR): cv.string,
     vol.Optional(
                     CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
                 ): cv.time_period
 })
-
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
     """Configure the platform and add the Linky sensor."""
@@ -58,10 +62,11 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
         username = config[CONF_USERNAME]
         password = config[CONF_PASSWORD]
         webdriver = config[CONF_WEBDRIVER]
+        wait_time = config[CONF_WAITTIME]
         tmpdir = config[CONF_TMPDIR]
         scan_interval = config[CONF_SCAN_INTERVAL]
 
-        account = VeoliaIDFAccount(hass, username, password, webdriver, tmpdir, scan_interval)
+        account = VeoliaIDFAccount(hass, username, password, webdriver, wait_time, tmpdir, scan_interval)
         add_entities(account.sensors, True)
         _LOGGER.debug("VeoliaIDF platform initialization has completed successfully")
     except BaseException:
@@ -70,11 +75,12 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 class VeoliaIDFAccount:
     """Representation of a VeoliaIDF account."""
 
-    def __init__(self, hass, username, password, webdriver, tmpdir, scan_interval):
+    def __init__(self, hass, username, password, webdriver, wait_time, tmpdir, scan_interval):
         """Initialise the VeoliaIDF account."""
         self._username = username
         self.__password = password
         self._webdriver = webdriver
+        self._wait_time = wait_time
         self._tmpdir = tmpdir
         self._scan_interval = scan_interval
         self._data = None
@@ -83,9 +89,9 @@ class VeoliaIDFAccount:
         call_later(hass, 5, self.update_veolia_data)
 
         self.sensors.append(
-            VeoliaIDFSensor(HA_PERIOD_START_TIME, PropertyNameEnum.DATE.value, None, BEFORE_LAST_INDEX, self))
+            VeoliaIDFSensor(HA_PERIOD_START_TIME, PropertyNameEnum.TIME.value, None, BEFORE_LAST_INDEX, self))
         self.sensors.append(
-            VeoliaIDFSensor(HA_PERIOD_END_TIME, PropertyNameEnum.DATE.value, None, LAST_INDEX, self))
+            VeoliaIDFSensor(HA_PERIOD_END_TIME, PropertyNameEnum.TIME.value, None, LAST_INDEX, self))
         self.sensors.append(
             VeoliaIDFSensor(HA_YESTERDAY_LITER, PropertyNameEnum.DAILY_LITER.value, VOLUME_LITERS, LAST_INDEX, self))
         self.sensors.append(
@@ -99,9 +105,9 @@ class VeoliaIDFAccount:
         _LOGGER.debug("Querying PyVeoliaIDF library for new data...")
 
         try:
-            client = Client(self._username, self.__password, self._webdriver, self._tmpdir)
+            client = Client(self._username, self.__password, self._webdriver, self._wait_time, self._tmpdir)
             client.update()
-            self._data = client.data
+            self._data = client.data()
             _LOGGER.debug(json.dumps(self._data, indent=2))
             for sensor in self.sensors:
                 sensor.async_schedule_update_ha_state(True)
@@ -189,8 +195,8 @@ class VeoliaIDFSensor(Entity):
                 else:
                     # data is a date with GAZPAR_DATE_FORMAT
                     self.__measure = datetime.strptime(data[self._identifier], VEOLIA_DATETIME_FORMAT)
-                self.__timestamp = data["timestamp"]
-                self.__type = data["type"]
+                self.__timestamp = data[PropertyNameEnum.TIMESTAMP.value]
+                self.__type = data[PropertyNameEnum.TYPE.value]
                 _LOGGER.debug("HA data have been updated successfully")
             else:
                 _LOGGER.debug("No data available yet for update")
