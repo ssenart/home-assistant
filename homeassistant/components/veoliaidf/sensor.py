@@ -1,10 +1,11 @@
 """Support for VeoliaIDF."""
-from datetime import timedelta
+from datetime import timedelta, datetime
 import json
 import logging
 import traceback
 
 from pyveoliaidf.client import Client
+from pygazpar.enum import PropertyNameEnum
 import voluptuous as vol
 
 from homeassistant.components.sensor import PLATFORM_SCHEMA
@@ -21,11 +22,21 @@ CONF_WEBDRIVER = "webdriver"
 CONF_TMPDIR = "tmpdir"
 DEFAULT_SCAN_INTERVAL = timedelta(hours=4)
 ICON_WATER = "mdi:water"
-DAILY_LITER_CONSUMPTION = "daily_liter"
-TOTAL_LITER_CONSUMPTION = "total_liter"
-TIME = "time"
-TYPE = "type"
-ATTRIBUTION = "Data provided by VeoliaIDF"
+
+HA_TIME = "time"
+HA_TIMESTAMP = "timestamp"
+HA_TYPE = "type"
+HA_ATTRIBUTION = "Data provided by VeoliaIDF"
+
+VEOLIA_DATETIME_FORMAT = "%d/%m/%Y %H:%M:%S"
+
+HA_PERIOD_START_TIME = "Veolia period start time"
+HA_PERIOD_END_TIME = "Veolia period end time"
+HA_YESTERDAY_LITER = "Veolia yesterday liter"
+HA_TOTAL_LITER = "Veolia total liter"
+
+LAST_INDEX = -1
+BEFORE_LAST_INDEX = -2
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(CONF_USERNAME): cv.string,
@@ -72,9 +83,13 @@ class VeoliaIDFAccount:
         call_later(hass, 5, self.update_veolia_data)
 
         self.sensors.append(
-            VeoliaIDFSensor("Veolia yesterday liter", DAILY_LITER_CONSUMPTION, VOLUME_LITERS, self))
+            VeoliaIDFSensor(HA_PERIOD_START_TIME, PropertyNameEnum.DATE.value, None, BEFORE_LAST_INDEX, self))
         self.sensors.append(
-            VeoliaIDFSensor("Veolia total liter", TOTAL_LITER_CONSUMPTION, VOLUME_LITERS, self))
+            VeoliaIDFSensor(HA_PERIOD_END_TIME, PropertyNameEnum.DATE.value, None, LAST_INDEX, self))
+        self.sensors.append(
+            VeoliaIDFSensor(HA_YESTERDAY_LITER, PropertyNameEnum.DAILY_LITER.value, VOLUME_LITERS, LAST_INDEX, self))
+        self.sensors.append(
+            VeoliaIDFSensor(HA_TOTAL_LITER, PropertyNameEnum.TOTAL_LITER.value, VOLUME_LITERS, LAST_INDEX, self))
 
         track_time_interval(hass, self.update_veolia_data, self._scan_interval)
 
@@ -119,14 +134,15 @@ class VeoliaIDFAccount:
 class VeoliaIDFSensor(Entity):
     """Representation of a sensor entity for Linky."""
 
-    def __init__(self, name, identifier, unit, account: VeoliaIDFAccount):
+    def __init__(self, name, identifier, unit, index, account: VeoliaIDFAccount):
         """Initialize the sensor."""
         self._name = name
         self._identifier = identifier
         self._unit = unit
+        self._index = index        
         self.__account = account
         self._username = account.username
-        self.__time = None
+        self.__timestamp = None
         self.__measure = None
         self.__type = None
 
@@ -154,10 +170,10 @@ class VeoliaIDFSensor(Entity):
     def device_state_attributes(self):
         """Return the state attributes of the sensor."""
         return {
-            ATTR_ATTRIBUTION: ATTRIBUTION,
-            TIME: self.__time,
-            CONF_USERNAME: self._username,
-            TYPE: self.__type
+            ATTR_ATTRIBUTION: HA_ATTRIBUTION,
+            HA_TIMESTAMP: self.__timestamp,
+            HA_TYPE: self.__type,
+            CONF_USERNAME: self._username
         }
 
     def update(self):
@@ -166,10 +182,15 @@ class VeoliaIDFSensor(Entity):
         _LOGGER.debug("HA requests its data to be updated...")
         try:
             if self.__account.data is not None:
-                data = self.__account.data[-1]
-                self.__measure = data[self._identifier]
-                self.__time = data[TIME]
-                self.__type = data[TYPE]
+                data = self.__account.data[self._index]
+                if self._unit is not None:
+                    # data is a measure in a given unit
+                    self.__measure = data[self._identifier]
+                else:
+                    # data is a date with GAZPAR_DATE_FORMAT
+                    self.__measure = datetime.strptime(data[self._identifier], VEOLIA_DATETIME_FORMAT)
+                self.__timestamp = data["timestamp"]
+                self.__type = data["type"]
                 _LOGGER.debug("HA data have been updated successfully")
             else:
                 _LOGGER.debug("No data available yet for update")
