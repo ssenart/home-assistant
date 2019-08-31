@@ -19,8 +19,10 @@ from homeassistant.helpers.event import track_time_interval, call_later
 _LOGGER = logging.getLogger(__name__)
 
 CONF_WEBDRIVER = "webdriver"
+CONF_WAITTIME = "wait_time"
 CONF_TMPDIR = "tmpdir"
 DEFAULT_SCAN_INTERVAL = timedelta(hours=4)
+DEFAULT_WAITTIME = 30
 ICON_GAS = "mdi:fire"
 
 HA_VOLUME_M3 = "m³"
@@ -48,6 +50,9 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(CONF_USERNAME): cv.string,
     vol.Required(CONF_PASSWORD): cv.string,
     vol.Required(CONF_WEBDRIVER): cv.string,
+    vol.Optional(
+                    CONF_WAITTIME, default=DEFAULT_WAITTIME
+                ): int,    
     vol.Required(CONF_TMPDIR): cv.string,
     vol.Optional(
                     CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
@@ -64,10 +69,11 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
         username = config[CONF_USERNAME]
         password = config[CONF_PASSWORD]
         webdriver = config[CONF_WEBDRIVER]
+        wait_time = config[CONF_WAITTIME]
         tmpdir = config[CONF_TMPDIR]
         scan_interval = config[CONF_SCAN_INTERVAL]
 
-        account = GazparAccount(hass, username, password, webdriver, tmpdir, scan_interval)
+        account = GazparAccount(hass, username, password, webdriver, wait_time, tmpdir, scan_interval)
         add_entities(account.sensors, True)
         _LOGGER.debug("Gazpar platform initialization has completed successfully")
     except BaseException:
@@ -76,11 +82,12 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 class GazparAccount:
     """Representation of a Gazpar account."""
 
-    def __init__(self, hass, username, password, webdriver, tmpdir, scan_interval):
+    def __init__(self, hass, username, password, webdriver, wait_time, tmpdir, scan_interval):
         """Initialise the Gazpar account."""
         self._username = username
         self.__password = password
         self._webdriver = webdriver
+        self._wait_time = wait_time        
         self._tmpdir = tmpdir
         self._scan_interval = scan_interval
         self._data = None
