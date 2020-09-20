@@ -1,11 +1,8 @@
 """Apprise platform for notify component."""
 import logging
 
-import voluptuous as vol
-
 import apprise
-
-import homeassistant.helpers.config_validation as cv
+import voluptuous as vol
 
 from homeassistant.components.notify import (
     ATTR_TARGET,
@@ -14,6 +11,7 @@ from homeassistant.components.notify import (
     PLATFORM_SCHEMA,
     BaseNotificationService,
 )
+import homeassistant.helpers.config_validation as cv
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,8 +29,11 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 def get_service(hass, config, discovery_info=None):
     """Get the Apprise notification service."""
 
-    # Create our object
-    a_obj = apprise.Apprise()
+    # Create our Apprise Asset Object
+    asset = apprise.AppriseAsset(async_mode=False)
+
+    # Create our Apprise Instance (reference our asset)
+    a_obj = apprise.Apprise(asset=asset)
 
     if config.get(CONF_FILE):
         # Sourced from a Configuration File

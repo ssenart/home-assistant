@@ -1,14 +1,13 @@
 """Tests for the Neato config flow."""
-import pytest
-from unittest.mock import patch
-
 from pybotvac.exceptions import NeatoLoginException, NeatoRobotException
+import pytest
 
 from homeassistant import data_entry_flow
 from homeassistant.components.neato import config_flow
 from homeassistant.components.neato.const import CONF_VENDOR, NEATO_DOMAIN
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 
+from tests.async_mock import patch
 from tests.common import MockConfigEntry
 
 USERNAME = "myUsername"

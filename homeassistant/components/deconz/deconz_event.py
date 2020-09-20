@@ -1,13 +1,12 @@
 """Representation of a deCONZ remote."""
-from homeassistant.const import CONF_EVENT, CONF_ID
+from homeassistant.const import CONF_EVENT, CONF_ID, CONF_UNIQUE_ID
 from homeassistant.core import callback
 from homeassistant.util import slugify
 
-from .const import _LOGGER
+from .const import CONF_ANGLE, CONF_GESTURE, CONF_XY, LOGGER
 from .deconz_device import DeconzBase
 
 CONF_DECONZ_EVENT = "deconz_event"
-CONF_UNIQUE_ID = "unique_id"
 
 
 class DeconzEvent(DeconzBase):
@@ -21,11 +20,11 @@ class DeconzEvent(DeconzBase):
         """Register callback that will be used for signals."""
         super().__init__(device, gateway)
 
-        self._device.register_async_callback(self.async_update_callback)
+        self._device.register_callback(self.async_update_callback)
 
         self.device_id = None
         self.event_id = slugify(self._device.name)
-        _LOGGER.debug("deCONZ event created: %s", self.event_id)
+        LOGGER.debug("deCONZ event created: %s", self.event_id)
 
     @property
     def device(self):
@@ -39,15 +38,27 @@ class DeconzEvent(DeconzBase):
         self._device = None
 
     @callback
-    def async_update_callback(self, force_update=False):
+    def async_update_callback(self, force_update=False, ignore_update=False):
         """Fire the event if reason is that state is updated."""
-        if "state" in self._device.changed_keys:
-            data = {
-                CONF_ID: self.event_id,
-                CONF_UNIQUE_ID: self.serial,
-                CONF_EVENT: self._device.state,
-            }
-            self.gateway.hass.bus.async_fire(CONF_DECONZ_EVENT, data)
+        if ignore_update or "state" not in self._device.changed_keys:
+            return
+
+        data = {
+            CONF_ID: self.event_id,
+            CONF_UNIQUE_ID: self.serial,
+            CONF_EVENT: self._device.state,
+        }
+
+        if self._device.gesture is not None:
+            data[CONF_GESTURE] = self._device.gesture
+
+        if self._device.angle is not None:
+            data[CONF_ANGLE] = self._device.angle
+
+        if self._device.xy is not None:
+            data[CONF_XY] = self._device.xy
+
+        self.gateway.hass.bus.async_fire(CONF_DECONZ_EVENT, data)
 
     async def async_update_device_registry(self):
         """Update device registry."""

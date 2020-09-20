@@ -4,6 +4,7 @@ from datetime import timedelta
 from homeassistant.components.weather import (
     ATTR_FORECAST_CONDITION,
     ATTR_FORECAST_PRECIPITATION,
+    ATTR_FORECAST_PRECIPITATION_PROBABILITY,
     ATTR_FORECAST_TEMP,
     ATTR_FORECAST_TEMP_LOW,
     ATTR_FORECAST_TIME,
@@ -30,6 +31,11 @@ CONDITION_CLASSES = {
 }
 
 
+async def async_setup_entry(hass, config_entry, async_add_entities):
+    """Set up the Demo config entry."""
+    setup_platform(hass, {}, async_add_entities)
+
+
 def setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up the Demo weather."""
     add_entities(
@@ -43,13 +49,13 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
                 0.5,
                 TEMP_CELSIUS,
                 [
-                    ["rainy", 1, 22, 15],
-                    ["rainy", 5, 19, 8],
-                    ["cloudy", 0, 15, 9],
-                    ["sunny", 0, 12, 6],
-                    ["partlycloudy", 2, 14, 7],
-                    ["rainy", 15, 18, 7],
-                    ["fog", 0.2, 21, 12],
+                    ["rainy", 1, 22, 15, 60],
+                    ["rainy", 5, 19, 8, 30],
+                    ["cloudy", 0, 15, 9, 10],
+                    ["sunny", 0, 12, 6, 0],
+                    ["partlycloudy", 2, 14, 7, 20],
+                    ["rainy", 15, 18, 7, 0],
+                    ["fog", 0.2, 21, 12, 100],
                 ],
             ),
             DemoWeather(
@@ -61,13 +67,13 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
                 4.8,
                 TEMP_FAHRENHEIT,
                 [
-                    ["snowy", 2, -10, -15],
-                    ["partlycloudy", 1, -13, -14],
-                    ["sunny", 0, -18, -22],
-                    ["sunny", 0.1, -23, -23],
-                    ["snowy", 4, -19, -20],
-                    ["sunny", 0.3, -14, -19],
-                    ["sunny", 0, -9, -12],
+                    ["snowy", 2, -10, -15, 60],
+                    ["partlycloudy", 1, -13, -14, 25],
+                    ["sunny", 0, -18, -22, 70],
+                    ["sunny", 0.1, -23, -23, 90],
+                    ["snowy", 4, -19, -20, 40],
+                    ["sunny", 0.3, -14, -19, 0],
+                    ["sunny", 0, -9, -12, 0],
                 ],
             ),
         ]
@@ -101,7 +107,7 @@ class DemoWeather(WeatherEntity):
     @property
     def name(self):
         """Return the name of the sensor."""
-        return "{} {}".format("Demo Weather", self._name)
+        return f"Demo Weather {self._name}"
 
     @property
     def should_poll(self):
@@ -158,6 +164,7 @@ class DemoWeather(WeatherEntity):
                 ATTR_FORECAST_PRECIPITATION: entry[1],
                 ATTR_FORECAST_TEMP: entry[2],
                 ATTR_FORECAST_TEMP_LOW: entry[3],
+                ATTR_FORECAST_PRECIPITATION_PROBABILITY: entry[4],
             }
             reftime = reftime + timedelta(hours=4)
             forecast_data.append(data_dict)
